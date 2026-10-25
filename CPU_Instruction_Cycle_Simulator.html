@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Instruction Cycle Simulator | COA Micro Project</title>
+<style>
+  :root { --navy:#102a43; --blue:#1769aa; --gold:#f4b942; --bg:#f3f7fb; --ink:#243b53; --green:#16845b; --red:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--ink); line-height:1.5; }
+  header { background:linear-gradient(120deg,var(--navy),#1769aa); color:white; padding:28px 18px; text-align:center; border-bottom:5px solid var(--gold); }
+  header h1 { margin:0 0 6px; font-size:clamp(1.45rem,4vw,2.15rem); }
+  header p { margin:0; opacity:.95; }
+  main { max-width:1050px; margin:22px auto; padding:0 14px 32px; }
+  .panel { background:white; border-radius:14px; padding:18px; margin-bottom:17px; box-shadow:0 4px 16px #102a4310; border:1px solid #d9e2ec; }
+  h2 { color:var(--navy); margin:0 0 12px; font-size:1.2rem; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; align-items:end; }
+  label { display:block; font-weight:700; font-size:.93rem; margin-bottom:6px; }
+  select,input { width:100%; padding:10px; border:1px solid #bcccdc; border-radius:8px; background:white; font-size:1rem; color:var(--ink); }
+  button { border:0; border-radius:8px; padding:11px 15px; font-weight:700; cursor:pointer; font-size:.95rem; }
+  button:focus,select:focus,input:focus { outline:3px solid #f4b94280; outline-offset:2px; }
+  .primary { background:var(--blue); color:white; }
+  .secondary { background:#e6eef7; color:var(--navy); }
+  .gold { background:var(--gold); color:#172b4d; }
+  .buttons { display:flex; flex-wrap:wrap; gap:9px; margin-top:15px; }
+  .stages { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .stage { padding:16px 8px; border:2px solid #d9e2ec; border-radius:12px; text-align:center; background:#f8fafc; }
+  .stage .num { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:50%; background:#d9e2ec; font-weight:800; margin-bottom:6px; }
+  .stage.active { border-color:var(--gold); background:#fff7df; box-shadow:0 0 0 2px #f4b94230; }
+  .stage.done { border-color:#8bd3b4; background:#e9f9f1; }
+  .stage.active .num { background:var(--gold); }
+  .stage.done .num { background:var(--green); color:white; }
+  .stage strong { display:block; }
+  .stage small { display:block; color:#526777; margin-top:4px; }
+  .status { background:#edf5fc; border-left:5px solid var(--blue); padding:13px 14px; border-radius:8px; min-height:65px; }
+  .status.success { background:#e9f9f1; border-color:var(--green); }
+  .status.error { background:#fff0ee; border-color:var(--red); }
+  .registers { display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:10px; }
+  .reg { background:#f8fafc; border:1px solid #d9e2ec; border-radius:10px; padding:12px; }
+  .reg span { display:block; font-size:.82rem; color:#526777; }
+  .reg strong { display:block; font-size:1.25rem; color:var(--navy); margin-top:3px; overflow-wrap:anywhere; }
+  .memory { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+  .mem { padding:10px; border:1px solid #d9e2ec; background:#f8fafc; border-radius:8px; }
+  .mem small { display:block; color:#526777; }
+  .mem strong { color:var(--navy); }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  ul { padding-left:22px; margin-bottom:0; }
+  li { margin:6px 0; }
+  .note { font-size:.9rem; color:#526777; }
+  footer { text-align:center; padding:15px; color:#526777; font-size:.85rem; }
+  @media(max-width:600px) { .stages{grid-template-columns:1fr;} .two-col{grid-template-columns:1fr;} header{padding:23px 12px;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>CPU Instruction Cycle Simulator</h1>
+  <p>COA C05 Micro Project · Fetch → Decode → Execute</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>1. Set the instruction</h2>
+    <p>Choose a simple instruction and set the starting values. Then run the simulation one stage at a time.</p>
+    <div class="controls">
+      <div>
+        <label for="instruction">Instruction</label>
+        <select id="instruction">
+          <option value="ADD">ADD A, B (A = A + B)</option>
+          <option value="SUB">SUB A, B (A = A - B)</option>
+          <option value="LOAD">LOAD A, [Memory] (A = Memory)</option>
+          <option value="STORE">STORE A, [Memory] (Memory = A)</option>
+        </select>
+      </div>
+      <div>
+        <label for="aValue">Register A (0–255)</label>
+        <input id="aValue" type="number" min="0" max="255" value="10">
+      </div>
+      <div>
+        <label for="bValue">Register B (0–255)</label>
+        <input id="bValue" type="number" min="0" max="255" value="5">
+      </div>
+      <div>
+        <label for="memValue">Memory value (0–255)</label>
+        <input id="memValue" type="number" min="0" max="255" value="20">
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="startBtn">Start / Reset Simulation</button>
+      <button class="gold" id="nextBtn">Next Stage →</button>
+      <button class="secondary" id="runBtn">Run All Stages</button>
+    </div>
+    <p class="note">For this educational model, register and memory values are limited to 0–255. If an ADD result is above 255, the simulator shows the 8-bit result.</p>
+  </section>
+
+  <section class="panel">
+    <h2>2. Instruction cycle</h2>
+    <div class="stages">
+      <div class="stage" id="fetchStage"><span class="num">1</span><strong>FETCH</strong><small>Get instruction from memory</small></div>
+      <div class="stage" id="decodeStage"><span class="num">2</span><strong>DECODE</strong><small>Understand the instruction</small></div>
+      <div class="stage" id="executeStage"><span class="num">3</span><strong>EXECUTE</strong><small>Perform the operation</small></div>
+    </div>
+    <div class="status" id="status" style="margin-top:14px" aria-live="polite">Ready. Press “Start / Reset Simulation” to begin.</div>
+  </section>
+
+  <section class="panel">
+    <h2>3. CPU registers</h2>
+    <div class="registers">
+      <div class="reg"><span>Program Counter (PC)</span><strong id="pc">100</strong></div>
+      <div class="reg"><span>Instruction Register (IR)</span><strong id="ir">—</strong></div>
+      <div class="reg"><span>Register A</span><strong id="regA">10</strong></div>
+      <div class="reg"><span>Register B</span><strong id="regB">5</strong></div>
+      <div class="reg"><span>Accumulator / Result</span><strong id="acc">—</strong></div>
+    </div>
+    <p class="note">PC starts at address 100 in this model and advances by 1 after the instruction is fetched. These are simplified teaching values, not a complete real CPU.</p>
+  </section>
+
+  <section class="panel">
+    <h2>4. Memory</h2>
+    <div class="memory">
+      <div class="mem"><small>Address 100</small><strong id="mem100">Instruction</strong></div>
+      <div class="mem"><small>Address 200</small><strong id="mem200">20</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>5. Step-by-step log</h2>
+    <ol id="log"><li>Simulation has not started yet.</li></ol>
+  </section>
+
+  <section class="panel two-col">
+    <div>
+      <h2>How it works</h2>
+      <ul>
+        <li><b>Fetch:</b> The CPU gets the instruction from memory and places it in the Instruction Register (IR).</li>
+        <li><b>Decode:</b> The control unit identifies the operation and the required data.</li>
+        <li><b>Execute:</b> The CPU performs the operation and updates the register or memory.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Project features</h2>
+      <ul>
+        <li>Four selectable instructions.</li>
+        <li>Editable register and memory values.</li>
+        <li>Step-by-step and full-run modes.</li>
+        <li>Visual stage highlights, register display, and operation log.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+<footer>COA C05 · Original educational simulation · HTML, CSS and JavaScript</footer>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let step = 0, state = null, logItems = [];
+  const stageIds = ['fetchStage','decodeStage','executeStage'];
+
+  function readNumber(id) {
+    const n = Number($(id).value);
+    if (!Number.isInteger(n) || n < 0 || n > 255) throw new Error($(id).previousElementSibling.textContent + ' must be an integer from 0 to 255.');
+    return n;
+  }
+  function addLog(message) {
+    logItems.push(message);
+    $('log').innerHTML = '';
+    logItems.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      $('log').appendChild(li);
+    });
+  }
+  function updateRegisters() {
+    $('pc').textContent = state.pc;
+    $('ir').textContent = state.ir || '—';
+    $('regA').textContent = state.a;
+    $('regB').textContent = state.b;
+    $('acc').textContent = state.acc === null ? '—' : state.acc;
+    $('mem100').textContent = state.instruction;
+    $('mem200').textContent = state.memory;
+  }
+  function showStage() {
+    stageIds.forEach((id, i) => {
+      $(id).classList.toggle('done', i < step);
+      $(id).classList.toggle('active', i === step && step < 3);
+    });
+  }
+  function reset() {
+    try {
+      const a = readNumber('aValue'), b = readNumber('bValue'), memory = readNumber('memValue');
+      state = { a, b, memory, pc:100, ir:'', acc:null, instruction:$('instruction').value };
+      step = 0; logItems = [];
+      $('status').className = 'status';
+      $('status').textContent = 'Ready. The CPU is about to fetch the selected instruction.';
+      $('log').innerHTML = '';
+      addLog('Simulation initialized. PC = 100; input values loaded.');
+      updateRegisters(); showStage();
+      $('nextBtn').disabled = false;
+    } catch (e) {
+      $('status').className = 'status error';
+      $('status').textContent = e.message;
+    }
+  }
+  function nextStage() {
+    if (!state) { reset(); if (!state) return; }
+    if (step >= 3) {
+      $('status').className = 'status success';
+      $('status').textContent = 'Instruction cycle complete. Press Start / Reset to try another instruction or new values.';
+      return;
+    }
+    if (step === 0) {
+      state.ir = state.instruction;
+      state.pc = 101;
+      $('status').className = 'status';
+      $('status').textContent = 'FETCH: CPU reads "' + state.instruction + '" from memory address 100 and stores it in IR. PC advances to 101.';
+      addLog('FETCH: IR ← Memory[100] = ' + state.ir + '; PC ← 101.');
+    } else if (step === 1) {
+      let meaning = '';
+      if (state.instruction === 'ADD') meaning = 'Add the values in A and B.';
+      if (state.instruction === 'SUB') meaning = 'Subtract B from A.';
+      if (state.instruction === 'LOAD') meaning = 'Copy the value from memory into A.';
+      if (state.instruction === 'STORE') meaning = 'Copy the value in A into memory.';
+      $('status').className = 'status';
+      $('status').textContent = 'DECODE: The control unit recognizes ' + state.instruction + '. ' + meaning;
+      addLog('DECODE: Control unit identifies the operation: ' + state.instruction + '.');
+    } else {
+      if (state.instruction === 'ADD') {
+        state.acc = (state.a + state.b) & 255;
+        state.a = state.acc;
+        addLog('EXECUTE: A ← A + B. Result = ' + state.acc + ' (8-bit result).');
+      } else if (state.instruction === 'SUB') {
+        state.acc = (state.a - state.b + 256) & 255;
+        state.a = state.acc;
+        addLog('EXECUTE: A ← A − B. Result = ' + state.acc + ' (8-bit result).');
+      } else if (state.instruction === 'LOAD') {
+        state.a = state.memory;
+        state.acc = state.a;
+        addLog('EXECUTE: A ← Memory[200]. A = ' + state.a + '.');
+      } else if (state.instruction === 'STORE') {
+        state.memory = state.a;
+        state.acc = state.a;
+        addLog('EXECUTE: Memory[200] ← A. Memory value = ' + state.memory + '.');
+      }
+      $('status').className = 'status success';
+      $('status').textContent = 'EXECUTE: Operation completed. Final result = ' + state.acc + '.';
+    }
+    step++;
+    updateRegisters();
+    showStage();
+    if (step === 3) $('nextBtn').textContent = 'Cycle Complete ✓';
+  }
+  function start() {
+    $('nextBtn').textContent = 'Next Stage →';
+    reset();
+  }
+  $('startBtn').addEventListener('click', start);
+  $('nextBtn').addEventListener('click', nextStage);
+  $('runBtn').addEventListener('click', () => {
+    if (!state) { reset(); if (!state) return; }
+    while (step < 3) nextStage();
+  });
+  $('instruction').addEventListener('change', () => { if (state) start(); });
+  ['aValue','bValue','memValue'].forEach(id => $(id).addEventListener('change', () => { if (state) start(); }));
+  reset();
+})();
+</script>
+</body>
+</html>
